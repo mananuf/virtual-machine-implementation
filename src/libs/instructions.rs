@@ -23,6 +23,7 @@ pub trait InstructionSet {
         memory: &impl MemomryTrait,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
+    fn not(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
 }
 
 pub struct Instructions {}
@@ -140,6 +141,17 @@ impl InstructionSet for Instructions {
 
         let _ = Self::update_flags(register_storage, Registers::R0);
 
+        Ok(())
+    }
+
+    fn not(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError> {
+        /* Read content of destination reg from instruction and store to register location R0 */
+        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
+        let _set_source_register_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
+
+        let _ = register_storage.store(!register_storage.load(Registers::R1).unwrap(), Registers::R0);
+
+        let _update_conditional_flag = Self::update_flags(register_storage, Registers::R0);
         Ok(())
     }
 }
