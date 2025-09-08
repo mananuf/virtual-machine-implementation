@@ -24,6 +24,7 @@ pub trait InstructionSet {
         instr: u16,
     ) -> Result<(), InstructionSetError>;
     fn not(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
+    fn branch(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
 }
 
 pub struct Instructions {}
@@ -167,6 +168,18 @@ impl InstructionSet for Instructions {
         );
 
         let _update_conditional_flag = Self::update_flags(register_storage, Registers::R0);
+        Ok(())
+    }
+
+    fn branch(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError> {
+        /* PCoffset9: Extract and sign-extend the immediate value */
+        let pc_offset = Self::sign_extend(instr & 0x1FF, 9)?;
+        let cond_flag = (instr >> 9) & 0x7;
+
+        if cond_flag & register_storage.load(Registers::COND).unwrap() != 0 {
+            register_storage.locations[Registers::PC as usize] += pc_offset;
+        }
+
         Ok(())
     }
 }
