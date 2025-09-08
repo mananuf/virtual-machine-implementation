@@ -1,7 +1,10 @@
 use std::io::ErrorKind;
 
+use tracing::info;
+
 use crate::libs::constants::MEMORY_MAX;
 
+#[derive(Debug)]
 pub enum Registers {
     R0 = 0,
     R1,
@@ -79,16 +82,20 @@ pub struct RegisterStorage {
 
 impl RegisterStorageTrait for RegisterStorage {
     fn new() -> Self {
+        info!("initializing new register storage");
+
         Self {
             locations: [0u16; Registers::COUNT as usize],
         }
     }
 
     fn load(&self, reg_location: Registers) -> Option<u16> {
+        info!("loading instruction from register: {reg_location:?}");
         Some(self.locations[reg_location as usize])
     }
 
     fn store(&mut self, instr: u16, reg_location: Registers) -> Result<(), ErrorKind> {
+        info!("storing instruction to register: {reg_location:?}");
         self.locations[reg_location as usize] = instr;
         Ok(())
     }
@@ -96,7 +103,8 @@ impl RegisterStorageTrait for RegisterStorage {
 
 pub trait MemomryTrait {
     fn new() -> Self;
-    fn memory_read(&self, register_storage: &mut RegisterStorage) -> Option<u16>;
+    fn read(&self, address: u16) -> u16;
+    fn write(&mut self, address: u16, value: u16);
 }
 
 #[derive(Debug)]
@@ -106,14 +114,20 @@ pub struct Memory {
 
 impl MemomryTrait for Memory {
     fn new() -> Self {
+        info!("initializing new memory");
+
         Self {
             locations: [0u16; MEMORY_MAX],
         }
     }
 
-    fn memory_read(&self, register_storage: &mut RegisterStorage) -> Option<u16> {
-        let memory_address_from_pc = register_storage.locations[Registers::PC as usize];
-        let _ = register_storage.store(memory_address_from_pc + 1, Registers::PC);
-        Some(memory_address_from_pc)
+    fn read(&self, memory_address: u16) -> u16 {
+        info!("reading from memory address: {memory_address:?}");
+        self.locations[memory_address as usize]
+    }
+
+    fn write(&mut self, memory_address: u16, value: u16) {
+        info!("storing to {value} memory address: {memory_address:?}");
+        self.locations[memory_address as usize] = value
     }
 }
