@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 thiserror = { version = "2.0.11"}
+tracing = "0.1"
+tracing-subscriber = "0.3"

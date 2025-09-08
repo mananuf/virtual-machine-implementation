@@ -1,4 +1,4 @@
-use std::u16;
+use std::{process::abort, u16};
 
 use virtual_machine::libs::{
     constants::{MEMORY_MAX, PC_START},
@@ -10,6 +10,8 @@ use virtual_machine::libs::{
 };
 
 fn main() {
+    tracing_subscriber::fmt::init();
+
     let mut register_storage: RegisterStorage = RegisterStorage::new();
     let mut memory: Memory = Memory::new();
 
@@ -22,9 +24,12 @@ fn main() {
     let _set_default_mem_addr_in_pc = register_storage.store(PC_START, Registers::PC);
 
     // loop {
-    //     /* FETCH */
-    //     let instr = memory.memory_read(&mut register_storage).unwrap();
-    //     let op = instr >> 12;
+    /* FETCH: Get the instruction from memory at the address pointed to by the PC */
+    // let pc = register_storage.load(Registers::PC).unwrap();
+    // let instr = memory.read(pc);
+
+    /* INCREMENT PC */
+    // register_storage.store(pc + 1, Registers::PC)?;
 
     //     match Opcodes::from_u16(op) {
     //         Some(Opcodes::ADD) => {
@@ -85,6 +90,7 @@ fn main() {
     //         },
     //         Some(Opcodes::RES) | Some(Opcodes::RTI) | _ => {
     //             println!("Bad Opcode");
+                    // abort();
     //             break;
     //         }
     //     }
@@ -98,8 +104,10 @@ fn main() {
     let bits = 0b01011;
     let sign_extend_result = Instructions::sign_extend(bits, bit_count).unwrap();
 
-    let a = 0b1000000000000000;
-    println!("{a}, {:b} {:b}", 0x7, a >> 9 & 0x7);
+    println!("{:016b}", sign_extend_result);
+    println!("{:04x}", 0b0000111000000000);
+    println!("{:04x}", 0b0000000111111111);
+    println!("{:04x}", 0b0000000000000111);
 
     println!("{:b}", sign_extend_result);
     println!("{register_storage:?}")
