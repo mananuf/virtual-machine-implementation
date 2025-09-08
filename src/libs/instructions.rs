@@ -24,7 +24,11 @@ pub trait InstructionSet {
         instr: u16,
     ) -> Result<(), InstructionSetError>;
     fn not(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
-    fn branch(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
+    fn branch(
+        register_storage: &mut RegisterStorage,
+        instr: u16,
+    ) -> Result<(), InstructionSetError>;
+    fn jump(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
 }
 
 pub struct Instructions {}
@@ -171,7 +175,10 @@ impl InstructionSet for Instructions {
         Ok(())
     }
 
-    fn branch(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError> {
+    fn branch(
+        register_storage: &mut RegisterStorage,
+        instr: u16,
+    ) -> Result<(), InstructionSetError> {
         /* PCoffset9: Extract and sign-extend the immediate value */
         let pc_offset = Self::sign_extend(instr & 0x1FF, 9)?;
         let cond_flag = (instr >> 9) & 0x7;
@@ -180,6 +187,13 @@ impl InstructionSet for Instructions {
             register_storage.locations[Registers::PC as usize] += pc_offset;
         }
 
+        Ok(())
+    }
+
+    fn jump(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError> {
+        let _set_source_registisert_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
+        let _update_pc =
+            register_storage.store(register_storage.load(Registers::R1).unwrap(), Registers::PC);
         Ok(())
     }
 }
