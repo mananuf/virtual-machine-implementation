@@ -1,5 +1,6 @@
 use std::{process::abort, u16};
 
+use tracing::info;
 use virtual_machine::libs::{
     constants::{MEMORY_MAX, PC_START},
     instructions::{InstructionSet, Instructions},
@@ -11,6 +12,7 @@ use virtual_machine::libs::{
 
 fn main() {
     tracing_subscriber::fmt::init();
+    // RUST_LOG=virtual_machine=trace cargo run --bin cli
 
     let mut register_storage: RegisterStorage = RegisterStorage::new();
     let mut memory: Memory = Memory::new();
