@@ -1,6 +1,8 @@
 use thiserror::Error;
 
-use crate::libs::types::{ConditionalFlags, RegisterStorage, Registers};
+use crate::libs::types::{
+    ConditionalFlags, MemomryTrait, RegisterStorage, RegisterStorageTrait, Registers,
+};
 
 #[derive(Debug, Error)]
 pub enum InstructionSetError {
@@ -16,6 +18,11 @@ pub trait InstructionSet {
     ) -> Result<(), InstructionSetError>;
     fn add(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
     fn and(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
+    fn ldi(
+        register_storage: &mut RegisterStorage,
+        memory: &impl MemomryTrait,
+        instr: u16,
+    ) -> Result<(), InstructionSetError>;
 }
 
 pub struct Instructions {}
@@ -54,10 +61,16 @@ impl InstructionSet for Instructions {
     }
 
     fn add(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError> {
-        /* destination register (DR) */
+        /*
+        destination register (DR):
+        extract the value at destination register from the instr and store in r0
+        */
         register_storage.locations[Registers::R0 as usize] = (instr >> 9) & 0x7;
 
-        /* first operand (SR1) */
+        /*
+        first operand (SR1):
+        extract the value at source register1 from instr and store in r1
+        */
         register_storage.locations[Registers::R1 as usize] = (instr >> 6) & 0x7;
 
         /* whether we are in immediate mode */
@@ -99,6 +112,31 @@ impl InstructionSet for Instructions {
                 [Registers::R1 as usize]
                 & register_storage.locations[Registers::R2 as usize];
         }
+
+        let _ = Self::update_flags(register_storage, Registers::R0);
+
+        Ok(())
+    }
+
+    fn ldi(
+        register_storage: &mut RegisterStorage,
+        memory: &impl MemomryTrait,
+        instr: u16,
+    ) -> Result<(), InstructionSetError> {
+        /* destination register (DR) */
+        register_storage.locations[Registers::R0 as usize] = (instr >> 9) & 0x7;
+
+        /* PCoffset9: Extract and sign-extend the immediate value */
+        let pc_offset = Self::sign_extend(instr & 0x1FF, 9)?;
+
+        let current_pc = register_storage.load(Registers::PC).unwrap();
+
+        /* Calculate the memory address */
+        let mem_address = current_pc + pc_offset;
+
+        let value = memory.read(memory.read(mem_address));
+
+        register_storage.locations[Registers::R0 as usize] = value;
 
         let _ = Self::update_flags(register_storage, Registers::R0);
 
