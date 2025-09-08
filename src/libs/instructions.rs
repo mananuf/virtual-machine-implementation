@@ -51,12 +51,12 @@ impl InstructionSet for Instructions {
     ) -> Result<(), InstructionSetError> {
         let result = register_storage.locations[destination_register as usize];
         if result == 0 {
-            register_storage.locations[Registers::COND as usize] = ConditionalFlags::ZRO as u16;
+            let _set_zero_conditional_flag= register_storage.store(ConditionalFlags::ZRO as u16, Registers::COND);
         } else if result >> 15 == 1 {
             /* a 1 in the left-most bit indicates negative */
-            register_storage.locations[Registers::COND as usize] = ConditionalFlags::NEG as u16;
+            let _set_negative_condition = register_storage.store(ConditionalFlags::NEG as u16, Registers::COND);
         } else {
-            register_storage.locations[Registers::COND as usize] = ConditionalFlags::POS as u16;
+            let _set_positive_condition = register_storage.store(ConditionalFlags::POS as u16, Registers::COND);
         }
         Ok(())
     }
