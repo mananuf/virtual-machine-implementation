@@ -29,6 +29,16 @@ pub trait InstructionSet {
         instr: u16,
     ) -> Result<(), InstructionSetError>;
     fn jump(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
+    fn load(
+        register_storage: &mut RegisterStorage,
+        memory: &impl MemomryTrait,
+        instr: u16,
+    ) -> Result<(), InstructionSetError>;
+    fn load_register(
+        register_storage: &mut RegisterStorage,
+        memory: &impl MemomryTrait,
+        instr: u16,
+    ) -> Result<(), InstructionSetError>;
 }
 
 pub struct Instructions {}
@@ -194,6 +204,38 @@ impl InstructionSet for Instructions {
         let _set_source_registisert_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
         let _update_pc =
             register_storage.store(register_storage.load(Registers::R1).unwrap(), Registers::PC);
+        Ok(())
+    }
+
+    fn load(
+        register_storage: &mut RegisterStorage,
+        memory: &impl MemomryTrait,
+        instr: u16,
+    ) -> Result<(), InstructionSetError> {
+        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
+        let pc_offset = Self::sign_extend(instr & 0x1FF, 9)?;
+        let memory_addr = register_storage.load(Registers::PC).unwrap() + pc_offset;
+        let _update_destination_register =
+            register_storage.store(memory.read(memory_addr), Registers::R0);
+
+        let _ = Self::update_flags(register_storage, Registers::R0);
+
+        Ok(())
+    }
+
+    fn load_register(
+        register_storage: &mut RegisterStorage,
+        memory: &impl MemomryTrait,
+        instr: u16,
+    ) -> Result<(), InstructionSetError> {
+        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
+        let _set_source_register_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
+        let offset = Self::sign_extend(instr & 0x3F, 6)?;
+        let memory_addr = register_storage.load(Registers::R1).unwrap() + offset;
+        let _update_destination_register =
+            register_storage.store(memory.read(memory_addr), Registers::R0);
+
+        let _ = Self::update_flags(register_storage, Registers::R0);
         Ok(())
     }
 }
