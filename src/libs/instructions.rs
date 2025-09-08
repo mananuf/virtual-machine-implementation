@@ -137,7 +137,7 @@ impl InstructionSet for Instructions {
         instr: u16,
     ) -> Result<(), InstructionSetError> {
         /* destination register (DR) */
-        register_storage.locations[Registers::R0 as usize] = (instr >> 9) & 0x7;
+        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
 
         /* PCoffset9: Extract and sign-extend the immediate value */
         let pc_offset = Self::sign_extend(instr & 0x1FF, 9)?;
@@ -149,7 +149,7 @@ impl InstructionSet for Instructions {
 
         let value = memory.read(memory.read(mem_address));
 
-        register_storage.locations[Registers::R0 as usize] = value;
+        let _update_destination_reg = register_storage.store(value, Registers::R0);
 
         let _ = Self::update_flags(register_storage, Registers::R0);
 
