@@ -66,26 +66,30 @@ impl InstructionSet for Instructions {
         destination register (DR):
         extract the value at destination register from the instr and store in r0
         */
-        register_storage.locations[Registers::R0 as usize] = (instr >> 9) & 0x7;
+        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
 
         /*
         first operand (SR1):
         extract the value at source register1 from instr and store in r1
         */
-        register_storage.locations[Registers::R1 as usize] = (instr >> 6) & 0x7;
+        let _set_source_register_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
 
         /* whether we are in immediate mode */
         let imm_flag = (instr >> 5) & 0x1;
 
         if imm_flag == 1 {
             let imm5 = Self::sign_extend(instr & 0x1F, 5).unwrap();
-            register_storage.locations[Registers::R0 as usize] =
-                register_storage.locations[Registers::R1 as usize] + imm5;
+            let _update_destination_register_imm5 = register_storage.store(
+                register_storage.load(Registers::R1).unwrap() + imm5,
+                Registers::R0,
+            );
         } else {
-            register_storage.locations[Registers::R2 as usize] = instr & 0x7;
-            register_storage.locations[Registers::R0 as usize] = register_storage.locations
-                [Registers::R1 as usize]
-                + register_storage.locations[Registers::R2 as usize];
+            let _set_source_reg_2 = register_storage.store(instr & 0x7, Registers::R2);
+            let _update_destination_register = register_storage.store(
+                register_storage.load(Registers::R1).unwrap()
+                    + register_storage.load(Registers::R2).unwrap(),
+                Registers::R0,
+            );
         }
 
         let _ = Self::update_flags(register_storage, Registers::R0);
@@ -149,7 +153,10 @@ impl InstructionSet for Instructions {
         let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
         let _set_source_register_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
 
-        let _ = register_storage.store(!register_storage.load(Registers::R1).unwrap(), Registers::R0);
+        let _ = register_storage.store(
+            !register_storage.load(Registers::R1).unwrap(),
+            Registers::R0,
+        );
 
         let _update_conditional_flag = Self::update_flags(register_storage, Registers::R0);
         Ok(())
