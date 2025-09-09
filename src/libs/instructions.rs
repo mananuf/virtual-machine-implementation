@@ -24,44 +24,59 @@ pub trait InstructionSet {
         instr: u16,
     ) -> Result<(), InstructionSetError>;
     fn not(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
+    /* BR */
     fn branch(
         register_storage: &mut RegisterStorage,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
+    /* JMP */
     fn jump(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
+    /* JMPR */
     fn jump_register(
         register_storage: &mut RegisterStorage,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
+    /* LD */
     fn load(
         register_storage: &mut RegisterStorage,
         memory: &impl MemomryTrait,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
+    /* LDR */
     fn load_register(
         register_storage: &mut RegisterStorage,
         memory: &impl MemomryTrait,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
+    /* LEA */
     fn load_effective_address(
         register_storage: &mut RegisterStorage,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
+    /* ST */
     fn store(
         register_storage: &mut RegisterStorage,
         memory: &mut Memory,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
+    /* STI */
     fn store_indirect(
         register_storage: &mut RegisterStorage,
         memory: &mut Memory,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
+    /* STR */
     fn store_register(
         register_storage: &mut RegisterStorage,
         memory: &mut Memory,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
+    /* RET */
+    fn return_from_subroutine(
+        register_storage: &mut RegisterStorage,
+    ) -> Result<(), InstructionSetError>;
+    /* RTI */
+    // fn return_from_interrupt(register_storage: &mut RegisterStorage, memory: &impl MemomryTrait, instr: u16) -> Result<(), InstructionSetError>;
 }
 
 pub struct Instructions {}
@@ -230,6 +245,26 @@ impl InstructionSet for Instructions {
         Ok(())
     }
 
+    fn jump_register(
+        register_storage: &mut RegisterStorage,
+        instr: u16,
+    ) -> Result<(), InstructionSetError> {
+        let _set_source_register_7 =
+            register_storage.store(register_storage.load(Registers::PC).unwrap(), Registers::R7);
+        let pc = register_storage.load(Registers::PC).unwrap();
+        if (instr >> 11) & 1 == 1 {
+            /* JSR */
+            let _update_pc_for_jsr =
+                register_storage.store(pc + Self::sign_extend(instr & 0x7FF, 11)?, Registers::PC);
+        } else {
+            /* JSRR */
+            let _set_source_reg_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
+            let _update_pc_for_jssr = register_storage
+                .store(register_storage.load(Registers::R1).unwrap(), Registers::PC);
+        }
+        Ok(())
+    }
+
     fn load(
         register_storage: &mut RegisterStorage,
         memory: &impl MemomryTrait,
@@ -321,6 +356,27 @@ impl InstructionSet for Instructions {
         memory.write(memory_addr, register_storage.load(Registers::R0).unwrap());
         Ok(())
     }
+
+    fn return_from_subroutine(
+        register_storage: &mut RegisterStorage,
+    ) -> Result<(), InstructionSetError> {
+        let _update_pc_value_with_r7 =
+            register_storage.store(register_storage.load(Registers::R7).unwrap(), Registers::PC);
+        Ok(())
+    }
+
+    // fn return_from_interrupt(register_storage: &mut RegisterStorage, memory: &impl MemomryTrait, instr: u16) -> Result<(), InstructionSetError> {
+    //     if (instr >> 15) & 1 == 0 {
+    //         let r6 = register_storage.load(Registers::R6).unwrap();
+    //         let _update_pc_with_value_from_memory_at_r6 = register_storage.store(memory.read(r6), Registers::PC);
+    //         let _increment_r6_by_1 = register_storage.store(r6 + 1, Registers::R6);
+    //         let r6 = register_storage.load(Registers::R6).unwrap();
+    //         let TEMP = memory.read(r6);
+    //         let _increment_r6_by_1 = register_storage.store(r6 + 1, Registers::R6);
+    //     }
+
+    //     Ok(())
+    // }
 }
 
 // 1000000000000000
