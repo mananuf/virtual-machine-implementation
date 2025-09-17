@@ -83,7 +83,11 @@ pub trait InstructionSet {
     //     memory: &impl MemomryTrait,
     //     instr: u16,
     // ) -> Result<(), InstructionSetError>;
-    fn trap(register_storage: &mut RegisterStorage, memory: &impl MemomryTrait, instr: u16) -> Result<(), InstructionSetError>;
+    fn trap(
+        register_storage: &mut RegisterStorage,
+        memory: &impl MemomryTrait,
+        instr: u16,
+    ) -> Result<(), InstructionSetError>;
 }
 
 pub struct Instructions {}
@@ -329,7 +333,10 @@ impl InstructionSet for Instructions {
     fn return_from_subroutine(
         register_storage: &mut RegisterStorage,
     ) -> Result<(), InstructionSetError> {
-        let _update_pc_value_with_r7 = register_storage.store(register_storage.load(Registers::R7 as u16)?, Registers::PC as u16)?;
+        let _update_pc_value_with_r7 = register_storage.store(
+            register_storage.load(Registers::R7 as u16)?,
+            Registers::PC as u16,
+        )?;
         Ok(())
     }
 
@@ -346,8 +353,15 @@ impl InstructionSet for Instructions {
     //     Ok(())
     // }
 
-    fn trap(register_storage: &mut RegisterStorage, memory: &impl MemomryTrait, instr: u16) -> Result<(), InstructionSetError> {
-        let _set_register_7 = register_storage.store(register_storage.load(Registers::PC as u16)?, Registers::R7 as u16)?;
+    fn trap(
+        register_storage: &mut RegisterStorage,
+        memory: &impl MemomryTrait,
+        instr: u16,
+    ) -> Result<(), InstructionSetError> {
+        let _set_register_7 = register_storage.store(
+            register_storage.load(Registers::PC as u16)?,
+            Registers::R7 as u16,
+        )?;
         Trap::execute_trap_instruction(register_storage, memory, instr)?;
         Ok(())
     }

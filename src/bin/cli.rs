@@ -1,4 +1,8 @@
-use std::{io::{self, Read}, process::abort, u16};
+use std::{
+    io::{self, Read},
+    process::abort,
+    u16,
+};
 
 use tracing::info;
 use virtual_machine::libs::{
@@ -113,6 +117,5 @@ fn main() {
 
     // println!("{:b}", sign_extend_result);
 
-    
     println!("{register_storage:?}")
 }
