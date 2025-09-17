@@ -1,8 +1,13 @@
-use std::io::ErrorKind;
-
+use thiserror::Error;
 use tracing::info;
 
 use crate::libs::constants::MEMORY_MAX;
+
+#[derive(Debug, Error)]
+pub enum RegisterError {
+    #[error("Invalid register: {0}")]
+    InvalidRegister(u16),
+}
 
 #[derive(Debug)]
 pub enum Registers {
@@ -71,8 +76,9 @@ pub enum ConditionalFlags {
 
 pub trait RegisterStorageTrait {
     fn new() -> Self;
-    fn load(&self, reg_location: Registers) -> Option<u16>;
-    fn store(&mut self, instr: u16, reg_location: Registers) -> Result<(), ErrorKind>;
+    fn load(&self, reg_location: u16) -> Result<u16, RegisterError>;
+    fn store(&mut self, instr: u16, reg_location: u16) -> Result<(), RegisterError>;
+    fn update_flags(&mut self, destination_register: u16) -> Result<(), RegisterError>;
 }
 
 #[derive(Debug)]
@@ -89,15 +95,53 @@ impl RegisterStorageTrait for RegisterStorage {
         }
     }
 
-    fn load(&self, reg_location: Registers) -> Option<u16> {
-        info!("loading instruction from register: {reg_location:?}");
-        Some(self.locations[reg_location as usize])
+    fn load(&self, reg_location: u16) -> Result<u16, RegisterError> {
+        let register = RegisterStorage::get_register(reg_location)?;
+
+        info!("loading instruction from register: {register:?}");
+        Ok(self.locations[register as usize])
     }
 
-    fn store(&mut self, instr: u16, reg_location: Registers) -> Result<(), ErrorKind> {
-        info!("storing instruction to register: {reg_location:?}");
-        self.locations[reg_location as usize] = instr;
+    fn store(&mut self, instr: u16, reg_location: u16) -> Result<(), RegisterError> {
+        let register = RegisterStorage::get_register(reg_location)?;
+
+        info!("storing instruction to register: {register:?}");
+        self.locations[register as usize] = instr;
         Ok(())
+    }
+
+    fn update_flags(&mut self, destination_register: u16) -> Result<(), RegisterError> {
+        let result = self.load(destination_register)?;
+        if result == 0 {
+            let _set_zero_conditional_flag =
+                self.store(ConditionalFlags::ZRO as u16, Registers::COND as u16)?;
+        } else if result >> 15 == 1 {
+            /* a 1 in the left-most bit indicates negative */
+            let _set_negative_condition =
+                self.store(ConditionalFlags::NEG as u16, Registers::COND as u16)?;
+        } else {
+            let _set_positive_condition =
+                self.store(ConditionalFlags::POS as u16, Registers::COND as u16)?;
+        }
+        Ok(())
+    }
+}
+
+impl RegisterStorage {
+    pub fn get_register(register: u16) -> Result<Registers, RegisterError> {
+        match register {
+            0 => Ok(Registers::R0),
+            1 => Ok(Registers::R1),
+            2 => Ok(Registers::R2),
+            3 => Ok(Registers::R3),
+            4 => Ok(Registers::R4),
+            5 => Ok(Registers::R5),
+            6 => Ok(Registers::R6),
+            7 => Ok(Registers::R7),
+            8 => Ok(Registers::PC),
+            9 => Ok(Registers::COND),
+            _ => Err(RegisterError::InvalidRegister(register)),
+        }
     }
 }
 
