@@ -1,21 +1,23 @@
 use thiserror::Error;
 
-use crate::libs::types::{
-    ConditionalFlags, MemomryTrait, Memory, RegisterStorage, RegisterStorageTrait, Registers,
+use crate::libs::{
+    trap::Trap,
+    types::{
+        ConditionalFlags, MemomryTrait, Memory, RegisterError, RegisterStorage,
+        RegisterStorageTrait, Registers,
+    },
 };
 
 #[derive(Debug, Error)]
 pub enum InstructionSetError {
-    #[error("Invalid Bit Count: {0}")]
+    #[error("Instruction Error: Invalid Bit Count {0}")]
     InvalidBitCount(u32),
+    #[error("Register Error: {0}")]
+    RegisterError(#[from] RegisterError),
 }
 
 pub trait InstructionSet {
     fn sign_extend(bits: u16, bit_count: u32) -> Result<u16, InstructionSetError>;
-    fn update_flags(
-        register_storage: &mut RegisterStorage,
-        data_register: Registers,
-    ) -> Result<(), InstructionSetError>;
     fn add(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
     fn and(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
     fn ldi(
@@ -24,59 +26,64 @@ pub trait InstructionSet {
         instr: u16,
     ) -> Result<(), InstructionSetError>;
     fn not(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
-    /* BR */
+    // /* BR */
     fn branch(
         register_storage: &mut RegisterStorage,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
-    /* JMP */
+    // /* JMP */
     fn jump(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
-    /* JMPR */
+    // /* JMPR */
     fn jump_register(
         register_storage: &mut RegisterStorage,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
-    /* LD */
+    // /* LD */
     fn load(
         register_storage: &mut RegisterStorage,
         memory: &impl MemomryTrait,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
-    /* LDR */
+    // /* LDR */
     fn load_register(
         register_storage: &mut RegisterStorage,
         memory: &impl MemomryTrait,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
-    /* LEA */
+    // /* LEA */
     fn load_effective_address(
         register_storage: &mut RegisterStorage,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
-    /* ST */
+    // /* ST */
     fn store(
         register_storage: &mut RegisterStorage,
         memory: &mut Memory,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
-    /* STI */
+    // /* STI */
     fn store_indirect(
         register_storage: &mut RegisterStorage,
         memory: &mut Memory,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
-    /* STR */
+    // /* STR */
     fn store_register(
         register_storage: &mut RegisterStorage,
         memory: &mut Memory,
         instr: u16,
     ) -> Result<(), InstructionSetError>;
-    /* RET */
+    // /* RET */
     fn return_from_subroutine(
         register_storage: &mut RegisterStorage,
     ) -> Result<(), InstructionSetError>;
     /* RTI */
-    // fn return_from_interrupt(register_storage: &mut RegisterStorage, memory: &impl MemomryTrait, instr: u16) -> Result<(), InstructionSetError>;
+    // fn return_from_interrupt(
+    //     register_storage: &mut RegisterStorage,
+    //     memory: &impl MemomryTrait,
+    //     instr: u16,
+    // ) -> Result<(), InstructionSetError>;
+    fn trap(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
 }
 
 pub struct Instructions {}
@@ -98,88 +105,59 @@ impl InstructionSet for Instructions {
         }
     }
 
-    fn update_flags(
-        register_storage: &mut RegisterStorage,
-        destination_register: Registers,
-    ) -> Result<(), InstructionSetError> {
-        let result = register_storage.locations[destination_register as usize];
-        if result == 0 {
-            let _set_zero_conditional_flag =
-                register_storage.store(ConditionalFlags::ZRO as u16, Registers::COND);
-        } else if result >> 15 == 1 {
-            /* a 1 in the left-most bit indicates negative */
-            let _set_negative_condition =
-                register_storage.store(ConditionalFlags::NEG as u16, Registers::COND);
-        } else {
-            let _set_positive_condition =
-                register_storage.store(ConditionalFlags::POS as u16, Registers::COND);
-        }
-        Ok(())
-    }
-
     fn add(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError> {
         /*
         destination register (DR):
-        extract the value at destination register from the instr and store in r0
+        extract the destination register from the instr
         */
-        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
+        let r0 = (instr >> 9) & 0x7;
 
         /*
         first operand (SR1):
-        extract the value at source register1 from instr and store in r1
+        extract the source register1 from instr
         */
-        let _set_source_register_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
+        let r1 = (instr >> 6) & 0x7;
 
         /* whether we are in immediate mode */
         let imm_flag = (instr >> 5) & 0x1;
 
         if imm_flag == 1 {
             let imm5 = Self::sign_extend(instr & 0x1F, 5).unwrap();
-            let _update_destination_register_imm5 = register_storage.store(
-                register_storage.load(Registers::R1).unwrap() + imm5,
-                Registers::R0,
-            );
+            let _update_destination_register_imm5 =
+                register_storage.store(register_storage.load(r1)? + imm5, r0)?;
         } else {
-            let _set_source_reg_2 = register_storage.store(instr & 0x7, Registers::R2);
-            let _update_destination_register = register_storage.store(
-                register_storage.load(Registers::R1).unwrap()
-                    + register_storage.load(Registers::R2).unwrap(),
-                Registers::R0,
-            );
+            let r2 = instr & 0x7;
+            let _update_destination_register =
+                register_storage.store(register_storage.load(r1)? + register_storage.load(r2)?, r0);
         }
 
-        let _ = Self::update_flags(register_storage, Registers::R0);
+        let _ = register_storage.update_flags(r0);
 
         Ok(())
     }
 
     fn and(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError> {
         /* destination register (DR) */
-        let _set_destination_reg = register_storage.store((instr >> 9) & 0x7, Registers::R0);
+        let r0 = (instr >> 9) & 0x7;
 
         /* first operand (SR1) */
-        let _set_source_register_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
+        let r1 = (instr >> 6) & 0x7;
 
         /* whether we are in immediate mode */
         let imm_flag = (instr >> 5) & 0x1;
 
         if imm_flag == 1 {
-            let imm5 = Self::sign_extend(instr & 0x1F, 5).unwrap();
-            let _update_destination_reg_with_imm5 = register_storage.store(
-                register_storage.load(Registers::R1).unwrap() & imm5,
-                Registers::R0,
-            );
+            let imm5 = Self::sign_extend(instr & 0x1F, 5)?;
+            let _update_destination_reg =
+                register_storage.store(register_storage.load(r1)? & imm5, r0)?;
         } else {
-            let _set_source_reg_2 = register_storage.store(instr & 0x7, Registers::R2);
+            let r2 = instr & 0x7;
 
-            let _update_destination_reg_without_imm5 = register_storage.store(
-                register_storage.load(Registers::R1).unwrap()
-                    & register_storage.load(Registers::R2).unwrap(),
-                Registers::R0,
-            );
+            let _update_destination_reg = register_storage
+                .store(register_storage.load(r1)? & register_storage.load(r2)?, r0)?;
         }
 
-        let _ = Self::update_flags(register_storage, Registers::R0);
+        let _ = register_storage.update_flags(r0);
 
         Ok(())
     }
@@ -190,36 +168,32 @@ impl InstructionSet for Instructions {
         instr: u16,
     ) -> Result<(), InstructionSetError> {
         /* destination register (DR) */
-        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
+        let r0 = (instr >> 9) & 0x7;
 
         /* PCoffset9: Extract and sign-extend the immediate value */
         let pc_offset = Self::sign_extend(instr & 0x1FF, 9)?;
 
-        let current_pc = register_storage.load(Registers::PC).unwrap();
+        let current_pc = register_storage.load(Registers::PC as u16)?;
 
         /* Calculate the memory address */
         let mem_address = current_pc + pc_offset;
 
         let value = memory.read(memory.read(mem_address));
 
-        let _update_destination_reg = register_storage.store(value, Registers::R0);
+        let _update_destination_reg = register_storage.store(value, r0);
 
-        let _ = Self::update_flags(register_storage, Registers::R0);
+        let _ = register_storage.update_flags(r0);
 
         Ok(())
     }
 
     fn not(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError> {
-        /* Read content of destination reg from instruction and store to register location R0 */
-        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
-        let _set_source_register_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
+        let r0 = (instr >> 9) & 0x7;
+        let r1 = (instr >> 6) & 0x7;
 
-        let _ = register_storage.store(
-            !register_storage.load(Registers::R1).unwrap(),
-            Registers::R0,
-        );
+        let _ = register_storage.store(!register_storage.load(r1)?, r0);
+        let _update_conditional_flag = register_storage.update_flags(r0)?;
 
-        let _update_conditional_flag = Self::update_flags(register_storage, Registers::R0);
         Ok(())
     }
 
@@ -231,7 +205,7 @@ impl InstructionSet for Instructions {
         let pc_offset = Self::sign_extend(instr & 0x1FF, 9)?;
         let cond_flag = (instr >> 9) & 0x7;
 
-        if cond_flag & register_storage.load(Registers::COND).unwrap() != 0 {
+        if cond_flag & register_storage.load(Registers::COND as u16)? != 0 {
             register_storage.locations[Registers::PC as usize] += pc_offset;
         }
 
@@ -239,9 +213,9 @@ impl InstructionSet for Instructions {
     }
 
     fn jump(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError> {
-        let _set_source_registisert_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
+        let r1 = (instr >> 6) & 0x7;
         let _update_pc =
-            register_storage.store(register_storage.load(Registers::R1).unwrap(), Registers::PC);
+            register_storage.store(register_storage.load(r1)?, Registers::PC as u16)?;
         Ok(())
     }
 
@@ -249,18 +223,20 @@ impl InstructionSet for Instructions {
         register_storage: &mut RegisterStorage,
         instr: u16,
     ) -> Result<(), InstructionSetError> {
-        let _set_source_register_7 =
-            register_storage.store(register_storage.load(Registers::PC).unwrap(), Registers::R7);
-        let pc = register_storage.load(Registers::PC).unwrap();
+        let pc = register_storage.load(Registers::PC as u16)?;
+        let _set_source_register_7 = register_storage.store(pc, Registers::R7 as u16)?;
+
         if (instr >> 11) & 1 == 1 {
             /* JSR */
-            let _update_pc_for_jsr =
-                register_storage.store(pc + Self::sign_extend(instr & 0x7FF, 11)?, Registers::PC);
+            let _update_pc_for_jsr = register_storage.store(
+                pc + Self::sign_extend(instr & 0x7FF, 11)?,
+                Registers::PC as u16,
+            );
         } else {
             /* JSRR */
-            let _set_source_reg_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
-            let _update_pc_for_jssr = register_storage
-                .store(register_storage.load(Registers::R1).unwrap(), Registers::PC);
+            let r1 = (instr >> 6) & 0x7;
+            let _update_pc_for_jssr =
+                register_storage.store(register_storage.load(r1)?, Registers::PC as u16);
         }
         Ok(())
     }
@@ -270,13 +246,12 @@ impl InstructionSet for Instructions {
         memory: &impl MemomryTrait,
         instr: u16,
     ) -> Result<(), InstructionSetError> {
-        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
+        let r0 = (instr >> 9) & 0x7;
         let pc_offset = Self::sign_extend(instr & 0x1FF, 9)?;
-        let memory_addr = register_storage.load(Registers::PC).unwrap() + pc_offset;
-        let _update_destination_register =
-            register_storage.store(memory.read(memory_addr), Registers::R0);
+        let memory_addr = register_storage.load(Registers::PC as u16)? + pc_offset;
+        let _update_destination_register = register_storage.store(memory.read(memory_addr), r0);
 
-        let _ = Self::update_flags(register_storage, Registers::R0);
+        let _ = register_storage.update_flags(r0);
 
         Ok(())
     }
@@ -286,14 +261,13 @@ impl InstructionSet for Instructions {
         memory: &impl MemomryTrait,
         instr: u16,
     ) -> Result<(), InstructionSetError> {
-        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
-        let _set_source_register_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
+        let r0 = (instr >> 9) & 0x7;
+        let r1 = (instr >> 6) & 0x7;
         let offset = Self::sign_extend(instr & 0x3F, 6)?;
-        let memory_addr = register_storage.load(Registers::R1).unwrap() + offset;
-        let _update_destination_register =
-            register_storage.store(memory.read(memory_addr), Registers::R0);
+        let memory_addr = register_storage.load(r1)? + offset;
+        let _update_destination_register = register_storage.store(memory.read(memory_addr), r1)?;
 
-        let _ = Self::update_flags(register_storage, Registers::R0);
+        let _ = register_storage.update_flags(r0);
         Ok(())
     }
 
@@ -301,14 +275,12 @@ impl InstructionSet for Instructions {
         register_storage: &mut RegisterStorage,
         instr: u16,
     ) -> Result<(), InstructionSetError> {
-        let _set_destination_reg = register_storage.store((instr >> 9) & 0x7, Registers::R0);
+        let r0 = (instr >> 9) & 0x7;
         let pc_offset = Self::sign_extend(instr & 0x1FF, 9)?;
-        let _update_destination_reg = register_storage.store(
-            register_storage.load(Registers::PC).unwrap() + pc_offset,
-            Registers::R0,
-        );
+        let _update_destination_reg =
+            register_storage.store(register_storage.load(Registers::PC as u16)? + pc_offset, r0);
 
-        let _ = Self::update_flags(register_storage, Registers::R0);
+        let _ = register_storage.update_flags(r0);
 
         Ok(())
     }
@@ -318,11 +290,11 @@ impl InstructionSet for Instructions {
         memory: &mut Memory,
         instr: u16,
     ) -> Result<(), InstructionSetError> {
-        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
+        let r0 = (instr >> 9) & 0x7;
         let pc_offset = Self::sign_extend(instr & 0x1FF, 9)?;
-        let memory_addr = register_storage.load(Registers::PC).unwrap() + pc_offset;
+        let memory_addr = register_storage.load(Registers::PC as u16)? + pc_offset;
 
-        memory.write(memory_addr, register_storage.load(Registers::R0).unwrap());
+        memory.write(memory_addr, register_storage.load(r0)?);
 
         Ok(())
     }
@@ -332,14 +304,11 @@ impl InstructionSet for Instructions {
         memory: &mut Memory,
         instr: u16,
     ) -> Result<(), InstructionSetError> {
-        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
+        let r0 = (instr >> 9) & 0x7;
         let pc_offset = Self::sign_extend(instr & 0x1FF, 9)?;
-        let memory_addr = register_storage.load(Registers::PC).unwrap() + pc_offset;
+        let memory_addr = register_storage.load(Registers::PC as u16)? + pc_offset;
 
-        memory.write(
-            memory.read(memory_addr),
-            register_storage.load(Registers::R0).unwrap(),
-        );
+        memory.write(memory.read(memory_addr), register_storage.load(r0)?);
         Ok(())
     }
 
@@ -348,20 +317,19 @@ impl InstructionSet for Instructions {
         memory: &mut Memory,
         instr: u16,
     ) -> Result<(), InstructionSetError> {
-        let _set_destination_register = register_storage.store((instr >> 9) & 0x7, Registers::R0);
-        let _set_source_register_1 = register_storage.store((instr >> 6) & 0x7, Registers::R1);
+        let r0 = (instr >> 9) & 0x7;
+        let r1 = (instr >> 6) & 0x7;
         let pc_offset = Self::sign_extend(instr & 0x3F, 6)?;
-        let memory_addr = register_storage.load(Registers::PC).unwrap() + pc_offset;
+        let memory_addr = register_storage.load(r1)? + pc_offset;
 
-        memory.write(memory_addr, register_storage.load(Registers::R0).unwrap());
+        memory.write(memory_addr, register_storage.load(r0)?);
         Ok(())
     }
 
     fn return_from_subroutine(
         register_storage: &mut RegisterStorage,
     ) -> Result<(), InstructionSetError> {
-        let _update_pc_value_with_r7 =
-            register_storage.store(register_storage.load(Registers::R7).unwrap(), Registers::PC);
+        let _update_pc_value_with_r7 = register_storage.store(register_storage.load(Registers::R7 as u16)?, Registers::PC as u16)?;
         Ok(())
     }
 
@@ -377,6 +345,12 @@ impl InstructionSet for Instructions {
 
     //     Ok(())
     // }
+
+    fn trap(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError> {
+        let _set_register_7 = register_storage.store(register_storage.load(Registers::PC as u16)?, Registers::R7 as u16)?;
+        Trap::execute_trap_instruction(register_storage, instr)?;
+        Ok(())
+    }
 }
 
 // 1000000000000000
