@@ -1,6 +1,6 @@
 use std::io::{self, Read, Write};
 
-use crate::libs::types::{RegisterError, RegisterStorage, RegisterStorageTrait, Registers};
+use crate::libs::types::{MemomryTrait, RegisterError, RegisterStorage, RegisterStorageTrait, Registers};
 
 #[derive(Debug)]
 pub enum Trap {
@@ -15,6 +15,7 @@ pub enum Trap {
 pub trait TrapTrait {
     fn getc(register_storage: &mut RegisterStorage) -> Result<(), RegisterError>;
     fn out(register_storage: &mut RegisterStorage) -> Result<(), RegisterError>;
+    fn puts(register_storage: &mut RegisterStorage, memory: &impl MemomryTrait) -> Result<(), RegisterError>;
 }
 
 impl TrapTrait for Trap {
@@ -47,7 +48,31 @@ impl TrapTrait for Trap {
         
         Ok(())
     }
+
+    fn puts(register_storage: &mut RegisterStorage, memory: &impl MemomryTrait) -> Result<(), RegisterError> {
+        let mut address = register_storage.load(Registers::R0 as u16)?;
+        
+        // Read and output characters until null terminator 0x0000
+        loop {
+            let memory_value = memory.read(address);
+
+            if memory_value == 0 {
+                break;
+            }
+            
+            let char_code = memory_value & 0x00FF;
+            if let Some(c) = char::from_u32(char_code as u32) {
+                print!("{}", c);
+            }
+            
+            address += 1;
+        }
+        
+        io::stdout().flush().unwrap();
+        Ok(())
+    }
 }
+
 impl Trap {
     pub fn execute_trap_instruction(register_storage: &mut RegisterStorage, trap_vector: u16) -> Result<(), RegisterError>{
         match Self::from_u16(trap_vector & 0xFF) {

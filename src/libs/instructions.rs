@@ -83,7 +83,7 @@ pub trait InstructionSet {
     //     memory: &impl MemomryTrait,
     //     instr: u16,
     // ) -> Result<(), InstructionSetError>;
-    fn trap(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError>;
+    fn trap(register_storage: &mut RegisterStorage, memory: &impl MemomryTrait, instr: u16) -> Result<(), InstructionSetError>;
 }
 
 pub struct Instructions {}
@@ -346,9 +346,9 @@ impl InstructionSet for Instructions {
     //     Ok(())
     // }
 
-    fn trap(register_storage: &mut RegisterStorage, instr: u16) -> Result<(), InstructionSetError> {
+    fn trap(register_storage: &mut RegisterStorage, memory: &impl MemomryTrait, instr: u16) -> Result<(), InstructionSetError> {
         let _set_register_7 = register_storage.store(register_storage.load(Registers::PC as u16)?, Registers::R7 as u16)?;
-        Trap::execute_trap_instruction(register_storage, instr)?;
+        Trap::execute_trap_instruction(register_storage, memory, instr)?;
         Ok(())
     }
 }
